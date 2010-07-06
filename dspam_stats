@@ -1,0 +1,117 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+# vim:et:ts=2:sw=2:
+#
+# To monitor dspam, link dspam_stats to this file. 
+# E.g.
+#    ln -s /usr/share/munin/plugins/dspam_stats /etc/munin/plugins/dspam_stats
+#
+# Needs following minimal configuration in plugin-conf.d/munin-node:
+#   [dspam_stats]
+#   user dspam
+#
+# Parameters
+# 	dspam_stats_path   - Specify path to dspam_stats program (Default: /usr/bin/dspam_stats)
+# 	dspam_stats_users  - List of user to query stats for. Can be a space separated list. (Default: '' e.g all users)
+# 
+# Author: Emmanuel Bretelle <chantra@debuntu.org>
+# 
+# v0.1 06/07/2010 - First release
+#
+# Copyright (c) 2010 Emmanuel Bretelle.
+#
+# GPL-2
+#
+# Magic markers
+#%# capabilities=autoconf
+#%# family=auto
+
+import os,sys
+import popen2
+import re 
+
+dspam_stats_path = os.getenv('dspam_stats_path',"/usr/bin/dspam_stats")
+dspam_stats_users = os.getenv('dspam_stats_users', "")
+
+
+# Increase verbosity of the plugin by putting verbose=True (for 
+# debugging purposes)
+# For python < 2.2 compliance, put verbose=0 instead of "False"
+verbose=False
+
+
+def verboselog(s):
+    sys.stderr.write(plugin_name+': '+s+'\n')
+
+if not verbose :
+    verboselog = lambda s: None
+
+def autoconf():
+  
+  if not os.path.exists(dspam_stats_path):
+    print "no (%s)" % (dspam_stats_path+" does not exists")
+    return 0
+  if not os.access(dspam_stats_path, os.X_OK):
+    print "no (%s)" % (dspam_stats_path+" is not executable")
+    return 0
+
+  print "yes"
+
+def print_config():
+  print '''graph_title DSpam statistics
+graph_category email
+graph_args --base 1000 -l 0
+graph_vlabel mails
+graph_scale yes
+graph_info This graph show the number of success/failure of DSpam
+tp.label True Positives
+tp.type DERIVE
+tn.label True Negatives
+tn.type DERIVE
+fp.label False Positives
+fp.type DERIVE
+fn.label False Negatives
+fn.type DERIVE
+sc.label Spam Corpusfed
+sc.type DERIVE
+nc.label Nonspam Corpusfed
+nc.type DERIVE'''
+
+def fetch_values():
+  r, w = popen2.popen2(dspam_stats_path)
+  tp = tn = fp = fn = sc = nc = 0
+  pat = re.compile("\s*")
+  for line in r.readlines():
+    m = re.match(r"(?P<name>\w+)\s+TP:\s+(?P<tp>\d+)\s+TN:\s+(?P<tn>\d+)\s+FP:\s+(?P<fp>\d+)\s+FN:\s+(?P<fn>\d+)\s+SC:\s+(?P<sc>\d+)\s+NC:\s+(?P<nc>\d+)", line)
+    tp = tp + int(m.group('tp'))
+    tn = tn + int(m.group('tn'))
+    fp = fp + int(m.group('fp'))
+    fn = fn + int(m.group('fn'))
+    sc = sc + int(m.group('sc'))
+    nc = nc + int(m.group('nc'))
+  r.close()
+  w.close()
+  print '''tp.value %d
+tn.value %d
+fp.value %d
+fn.value %d
+sc.value %d
+nc.value %d''' % (tp, tn, fp, fn, sc, nc)
+
+def main(sys):
+  if len(sys) > 1:
+    if sys[1] == "autoconf":
+      autoconf()
+      return 0
+    if sys[1] in ['detect' ]:
+      print "yes"
+      return 0
+    elif sys[1] == 'config':
+      print_config()
+      return 0
+  fetch_values()
+  return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+
