@@ -24,7 +24,7 @@
 #
 # Magic markers
 #%# capabilities=autoconf
-#%# family=auto
+#%# family=auto contrib
 
 import os,sys
 import popen2
@@ -60,8 +60,8 @@ def autoconf():
 def print_config():
   print '''graph_title DSpam statistics
 graph_category email
-graph_args --base 1000 -l 0
-graph_vlabel mails
+graph_vlabel mails / minutes
+graph_period minute
 graph_scale yes
 graph_info This graph show the number of success/failure of DSpam
 tp.label True Positives
